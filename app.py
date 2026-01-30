@@ -152,14 +152,15 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    st.markdown("**Orientation**")
-    orientation = st.radio(
-        "Orientation",
-        ["Landscape (16:9)", "Portrait (9:16)"],
+    st.markdown("**Where will you publish?**")
+    platform_preset = st.selectbox(
+        "Platform",
+        ["YouTube & TV (Wide)", "TikTok, Reels & Shorts (Vertical)"],
         index=0,
-        help="Portrait is best for TikTok, Reels, and Shorts",
+        help="Select the platform to optimize the video size.",
         label_visibility="collapsed"
     )
+    orientation = "Portrait (9:16)" if "TikTok" in platform_preset else "Landscape (16:9)"
     
     st.markdown("**Duration**")
     duration_mode = st.radio(
