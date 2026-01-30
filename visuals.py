@@ -9,6 +9,12 @@ STYLES = [
     "Minimal Flash",
 ]
 
+# Platform presets for orientation and aspect ratio
+PLATFORMS = {
+    "YouTube & TV (16:9)": "Landscape (16:9)",
+    "TikTok, Reels & Shorts (9:16)": "Portrait (9:16)",
+}
+
 def asset_filename(style: str, out_dir: str = "assets") -> str:
     """Return the filesystem path for a style's preview asset.
 

@@ -7,14 +7,14 @@ import uuid
 from moviepy.editor import VideoClip, AudioFileClip
 
 # Shared visual style constants
-from visuals import STYLES, asset_filename
+from visuals import STYLES, PLATFORMS, asset_filename
 
 # --- APP CONFIGURATION ---
 st.set_page_config(
     page_title="Music Visualizer",
     page_icon=":material/equalizer:",
     layout="wide",
-    initial_sidebar_state="collapsed" # Better for mobile-first
+    initial_sidebar_state="expanded" 
 )
 
 # --- PREMIUM UI CSS ---
@@ -50,38 +50,69 @@ st.markdown("""
         font-size: 2.2rem;
         margin-bottom: 0.5rem;
     }
+
+    /* Subtitle Contrast Fix */
+    .subtitle {
+        text-align: center; 
+        color: #555; 
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
     
+    /* Input Focus States for Accessibility */
+    .stSelectbox:focus-within, .stRadio:focus-within, .stFileUploader:focus-within {
+        outline: 2px solid #0071e3;
+        outline-offset: 4px;
+        border-radius: 4px;
+    }
+
+    /* Standardized Button Padding */
+    .stButton > button, .stDownloadButton > button {
+        padding: 0.8rem 1.5rem !important;
+        font-weight: 600 !important;
+        border-radius: 980px !important;
+        transition: all 0.2s ease !important;
+        width: 100% !important;
+        border: none !important;
+    }
+
     .stButton > button {
-        background: #0071e3;
-        color: white;
-        font-weight: 600;
-        border-radius: 980px;
-        padding: 0.8rem 1.5rem;
-        border: none;
-        width: 100%;
+        background: #0071e3 !important;
+        color: white !important;
     }
     
     .stDownloadButton > button {
         background: #34a853 !important;
         color: white !important;
-        font-weight: 700 !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        width: 100% !important;
+    }
+
+    .stButton > button:hover {
+        background: #0077ed !important;
+        box-shadow: 0 4px 12px rgba(0,113,227,0.3) !important;
+    }
+
+    .stDownloadButton > button:hover {
+        background: #2d8e47 !important;
+        box-shadow: 0 4px 12px rgba(52,168,83,0.3) !important;
     }
 
     /* Mobile specific tweaks */
     @media (max-width: 768px) {
         h1 { font-size: 1.8rem; }
         .stButton > button { padding: 1rem; }
+        /* Fix cramped columns on mobile */
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+        }
     }
     
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER SECTION ---
-st.markdown("<h1 style='text-align: center;'>AI Music Visualizer</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #86868b;'>Turn audio into reactive visuals in seconds.</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>:material/equalizer: AI Music Visualizer</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Turn audio into reactive visuals in seconds.</p>", unsafe_allow_html=True)
 
 # --- ADVANCED SETTINGS (SIDEBAR) ---
 with st.sidebar:
@@ -89,13 +120,15 @@ with st.sidebar:
     resolution_mode = st.selectbox(
         "Resolution",
         ["Mobile Low (480p)", "HD (720p)", "Full HD (1080p)"],
-        index=0
+        index=0,
+        help="Higher resolutions take longer to render."
     )
     duration_mode = st.radio(
         "Duration", 
-        ["Preview (30s)", "Full Song"]
+        ["Preview (30s)", "Full Song"],
+        help="Preview is best for testing styles quickly."
     )
-    st.info("💡 Pro Tip: Use 'Mobile Low' for faster rendering on phone.")
+    st.info(":material/lightbulb: Pro Tip: Use 'Mobile Low' for faster rendering on phone.")
 
 # --- AUDIO PROCESSING FUNCTIONS ---
 def get_audio_features(file_path):
@@ -160,14 +193,14 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
     return frame
 
 # --- MAIN CONTENT FLOW ---
-m_col1, m_col2, m_col3 = st.columns([1, 2, 1])
+m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 
 with m_col2:
     # 1. UPLOAD
     uploaded_file = st.file_uploader(
-        "Upload Audio", 
+        "Upload your audio or video file", 
         type=["mp3", "wav", "mp4", "mov", "m4a"],
-        label_visibility="collapsed"
+        label_visibility="visible" # Accessibility fix
     )
     
     if uploaded_file:
@@ -181,48 +214,65 @@ with m_col2:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 3. CORE SETTINGS (Moved to Main Page for Mobile)
+        # 3. CORE SETTINGS
         st.markdown("### :material/palette: Design Studio")
         
         # Style with Preview
-        visual_style = st.selectbox("Choose Visual Theme", STYLES)
+        visual_style = st.selectbox("Visual Theme", STYLES, help="Select a visual style for your music.")
         
         preview_path = asset_filename(visual_style)
         if os.path.exists(preview_path):
             st.image(preview_path, use_container_width=True)
         
         # Platform
+        platform_list = list(PLATFORMS.keys())
         platform_preset = st.selectbox(
             "Where will you publish?",
-            ["YouTube & TV (Wide)", "TikTok, Reels & Shorts (Vertical)"]
+            platform_list,
+            help="This sets the video orientation (Wide or Vertical)."
         )
-        orientation = "Portrait (9:16)" if "TikTok" in platform_preset else "Landscape (16:9)"
+        orientation = PLATFORMS[platform_preset]
 
         st.markdown("<br>", unsafe_allow_html=True)
         
         # 4. GENERATE
-        generate_btn = st.button("Generate Video", icon="✨")
+        generate_btn = st.button("Generate Video", icon=":material/magic_button:")
 
         if generate_btn:
             output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
-            with st.status("🚀 Creating magic...", expanded=True) as status:
+            with st.status(":material/rocket_launch: Creating magic...", expanded=True) as status:
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix="."+file_type) 
                 tfile.write(uploaded_file.read()); temp_input_path = tfile.name; tfile.close()
                 try:
+                    status.write(":material/analytics: Analyzing audio spectrum...")
                     y, sr, dur, rms, spec = get_audio_features(temp_input_path)
+                    
                     rend_dur = 30 if duration_mode == "Preview (30s)" else dur
                     if resolution_mode == "Mobile Low (480p)": W, H = 854, 480
                     elif resolution_mode == "HD (720p)": W, H = 1280, 720
                     else: W, H = 1920, 1080
-                    if orientation == "Portrait (9:16)": W, H = H, W
+                    if "Portrait" in orientation: W, H = H, W
                     
-                    def mf(t): return draw_frame(t, visual_style, rms, spec, sr, W, H)
+                    status.write(f":material/brush: Rendering {int(rend_dur * 24)} frames...")
+                    progress_bar = st.progress(0, text="Rendering frames...")
+                    
+                    def mf(t):
+                        # Update progress bar
+                        prog = min(t / rend_dur, 1.0)
+                        progress_bar.progress(prog, text=f"Rendering: {int(prog*100)}%")
+                        return draw_frame(t, visual_style, rms, spec, sr, W, H)
+                    
                     clip = VideoClip(mf, duration=rend_dur)
                     audio = AudioFileClip(temp_input_path).subclip(0, rend_dur)
                     clip.set_audio(audio).write_videofile(output_video_path, fps=24, codec='libx264', audio_codec='aac', preset='ultrafast', logger=None)
-                    status.update(label="✅ Ready!", state="complete", expanded=False)
+                    
+                    status.update(label=":material/check_circle: Ready!", state="complete", expanded=False)
                     st.balloons()
-                except Exception as e: st.error(f"Error: {e}")
+                
+                except MemoryError:
+                    st.error(":material/memory: File too large or resolution too high. Try 'Preview' or 'Mobile Low'.")
+                except Exception as e:
+                    st.error(f":material/error: An error occurred: {e}")
                 finally: 
                     if os.path.exists(temp_input_path): os.remove(temp_input_path)
 
@@ -237,16 +287,17 @@ with m_col2:
                         label="DOWNLOAD VIDEO",
                         data=f,
                         file_name="visualizer.mp4",
-                        mime="video/mp4"
+                        mime="video/mp4",
+                        icon=":material/download:"
                     )
                 
                 # SHARE
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("### :material/share: Share")
+                st.markdown("### :material/share: Share Your Creation")
                 s_col1, s_col2, s_col3 = st.columns(3)
                 s_col1.link_button("YouTube", "https://studio.youtube.com", icon=":material/smart_display:", use_container_width=True)
                 s_col2.link_button("TikTok", "https://www.tiktok.com/upload", icon=":material/music_note:", use_container_width=True)
                 s_col3.link_button("Instagram", "https://www.instagram.com/", icon=":material/photo_camera:", use_container_width=True)
     else:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.info("💡 Note: You can adjust Resolution and Duration in the sidebar menu.")
+        st.info(":material/info: Adjust Resolution and Duration in the sidebar menu.")
