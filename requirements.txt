@@ -2,3 +2,4 @@ streamlit
 moviepy<2.0
 librosa
 numpy
+requests
