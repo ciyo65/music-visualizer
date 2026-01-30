@@ -6,6 +6,9 @@ import os
 import uuid
 from moviepy.editor import VideoClip, AudioFileClip
 
+# Shared visual style constants
+from visuals import STYLES, asset_filename
+
 # --- APP CONFIGURATION ---
 st.set_page_config(
     page_title="Music Visualizer",
@@ -182,10 +185,9 @@ with m_col2:
         st.markdown("### :material/palette: Design Studio")
         
         # Style with Preview
-        style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
-        visual_style = st.selectbox("Choose Visual Theme", style_options)
+        visual_style = st.selectbox("Choose Visual Theme", STYLES)
         
-        preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
+        preview_path = asset_filename(visual_style)
         if os.path.exists(preview_path):
             st.image(preview_path, use_container_width=True)
         
