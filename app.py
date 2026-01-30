@@ -114,9 +114,31 @@ st.markdown("""
 st.markdown("<h1 style='text-align: center;'>:material/equalizer: AI Music Visualizer</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitle'>Turn audio into reactive visuals in seconds.</p>", unsafe_allow_html=True)
 
-# --- ADVANCED SETTINGS (SIDEBAR) ---
+# --- SIDEBAR: DESIGN STUDIO ---
 with st.sidebar:
-    st.markdown("### :material/settings: Advanced")
+    st.markdown("### :material/palette: Design Studio")
+    
+    # 1. Visual Style
+    visual_style = st.selectbox("Visual Theme", STYLES, help="Select a visual style for your music.")
+    
+    # Preview
+    preview_path = asset_filename(visual_style)
+    if os.path.exists(preview_path):
+        st.image(preview_path, use_container_width=True)
+
+    # 2. Platform / Orientation
+    platform_list = list(PLATFORMS.keys())
+    platform_preset = st.selectbox(
+        "Where will you publish?",
+        platform_list,
+        help="This sets the video orientation (Wide or Vertical)."
+    )
+    orientation = PLATFORMS[platform_preset]
+    
+    st.markdown("---")
+    
+    # 3. Advanced Settings
+    st.markdown("### :material/settings: Output Settings")
     resolution_mode = st.selectbox(
         "Resolution",
         ["Mobile Low (480p)", "HD (720p)", "Full HD (1080p)"],
@@ -128,7 +150,8 @@ with st.sidebar:
         ["Preview (30s)", "Full Song"],
         help="Preview is best for testing styles quickly."
     )
-    st.info(":material/lightbulb: Pro Tip: Use 'Mobile Low' for faster rendering on phone.")
+    
+    st.info(":material/lightbulb: Pro Tip: Use 'Mobile Low' for faster rendering.")
 
 # --- AUDIO PROCESSING FUNCTIONS ---
 def get_audio_features(file_path):
@@ -200,7 +223,7 @@ with m_col2:
     uploaded_file = st.file_uploader(
         "Upload your audio or video file", 
         type=["mp3", "wav", "mp4", "mov", "m4a"],
-        label_visibility="visible" # Accessibility fix
+        label_visibility="visible"
     )
     
     if uploaded_file:
@@ -214,28 +237,7 @@ with m_col2:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 3. CORE SETTINGS
-        st.markdown("### :material/palette: Design Studio")
-        
-        # Style with Preview
-        visual_style = st.selectbox("Visual Theme", STYLES, help="Select a visual style for your music.")
-        
-        preview_path = asset_filename(visual_style)
-        if os.path.exists(preview_path):
-            st.image(preview_path, use_container_width=True)
-        
-        # Platform
-        platform_list = list(PLATFORMS.keys())
-        platform_preset = st.selectbox(
-            "Where will you publish?",
-            platform_list,
-            help="This sets the video orientation (Wide or Vertical)."
-        )
-        orientation = PLATFORMS[platform_preset]
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 4. GENERATE
+        # 3. GENERATE (Moved Action Here)
         generate_btn = st.button("Generate Video", icon=":material/magic_button:")
 
         if generate_btn:
@@ -257,7 +259,6 @@ with m_col2:
                     progress_bar = st.progress(0, text="Rendering frames...")
                     
                     def mf(t):
-                        # Update progress bar
                         prog = min(t / rend_dur, 1.0)
                         progress_bar.progress(prog, text=f"Rendering: {int(prog*100)}%")
                         return draw_frame(t, visual_style, rms, spec, sr, W, H)
@@ -276,7 +277,7 @@ with m_col2:
                 finally: 
                     if os.path.exists(temp_input_path): os.remove(temp_input_path)
 
-            # 5. RESULTS
+            # 4. RESULTS
             if os.path.exists(output_video_path):
                 st.markdown("---")
                 st.markdown("### :material/check_circle: Your Masterpiece")
@@ -300,4 +301,4 @@ with m_col2:
                 s_col3.link_button("Instagram", "https://www.instagram.com/", icon=":material/photo_camera:", use_container_width=True)
     else:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.info(":material/info: Adjust Resolution and Duration in the sidebar menu.")
+        st.info(":material/palette: Open the Sidebar to customize your Visual Style and Settings!")
