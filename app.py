@@ -8,38 +8,126 @@ import math
 from moviepy.editor import VideoClip, AudioFileClip
 
 # --- APP CONFIGURATION ---
-st.set_page_config(page_title="Music Visualizer", page_icon="🎵")
+st.set_page_config(
+    page_title="Music Visualizer",
+    page_icon="🎵",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🎵 AI Music Visualizer")
-st.write("Upload a track (MP3, WAV, AAC, etc.) or video (MP4, MOV), pick a style, and generate your video.")
+# --- CUSTOM CSS FOR "APP-LIKE" UI ---
+st.markdown("""
+<style>
+    /* Main Font & Background */
+    html, body, [class*="css"]  {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    /* Hide Streamlit Header/Footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Custom Header */
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1A73E8; /* Google Blue */
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+    .sub-header {
+        font-size: 1.1rem;
+        color: #5f6368;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    /* Cards */
+    .stCard {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+
+    /* Primary Button Styling */
+    .stButton > button {
+        background-color: #1A73E8;
+        color: white;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        border: none;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+    .stButton > button:hover {
+        background-color: #1557B0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* Download Button Styling */
+    .stDownloadButton > button {
+        background-color: #34A853; /* Google Green */
+        color: white;
+        border-radius: 8px;
+    }
+    .stDownloadButton > button:hover {
+        background-color: #2D8E47;
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: #F8F9FA;
+        border-right: 1px solid #E0E0E0;
+    }
+    
+    /* Inputs */
+    .stSelectbox, .stFileUploader {
+        margin-bottom: 1rem;
+    }
+    
+</style>
+""", unsafe_allow_html=True)
+
+# --- HEADER ---
+st.markdown('<div class="main-header">🎵 AI Music Visualizer</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Turn your audio into stunning, reactive visuals in seconds.</div>', unsafe_allow_html=True)
 
 # --- SIDEBAR SETTINGS ---
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.markdown("### 🎨 Design Studio")
     
     # 1. Visual Style
     style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
     visual_style = st.selectbox(
-        "Choose Visual Style",
+        "Visual Style",
         style_options
     )
     
     # Show Preview GIF
     preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
     if os.path.exists(preview_path):
-        st.image(preview_path, caption=f"Preview: {visual_style}", use_container_width=True)
+        st.image(preview_path, use_container_width=True)
+        st.caption(f"Preview: {visual_style}")
     
+    st.markdown("---")
+    st.markdown("### ⚙️ Output Settings")
+
     # 2. Resolution (Crucial for Cloud Stability)
     resolution_mode = st.selectbox(
-        "Video Resolution",
+        "Resolution",
         ["Mobile Low (480p)", "HD (720p)", "Full HD (1080p)"],
-        index=0 # Default to 480p to prevent crashes
+        index=0,
+        help="Higher resolutions take longer to render."
     )
     
     # 3. Duration Limit
-    duration_mode = st.radio("Render Length", ["Preview (30s)", "Full Song"])
+    duration_mode = st.radio("Duration", ["Preview (30s)", "Full Song"])
 
-    st.info("💡 **Tip:** Use 'Mobile Low' or 'HD' for faster rendering on the free cloud server.")
+    st.info("💡 **Pro Tip:** Start with 'Mobile Low' to test your settings quickly.")
 
 # --- AUDIO PROCESSING ---
 def get_audio_features(file_path):
@@ -250,26 +338,36 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
     return frame
 
 # --- MAIN LOGIC ---
-uploaded_file = st.file_uploader(
-    "Choose a file (Audio or Video)", 
-    type=["mp3", "wav", "ogg", "flac", "aac", "m4a", "mp4", "mov", "avi", "mkv"]
-)
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col2:
+    uploaded_file = st.file_uploader(
+        "📂 Drag and drop your audio/video file here", 
+        type=["mp3", "wav", "ogg", "flac", "aac", "m4a", "mp4", "mov", "avi", "mkv"]
+    )
 
 if uploaded_file is not None:
-    # Display audio player regardless of format (streamlit converts internally or browser handles it)
-    # For video files, st.audio works if it has an audio track, but st.video is better for previewing input video.
-    file_type = uploaded_file.name.split('.')[-1].lower()
+    # Use a container for a clean "card" look
+    with st.container():
+        st.markdown("### 🎧 Preview Input")
+        file_type = uploaded_file.name.split('.')[-1].lower()
+        
+        if file_type in ['mp4', 'mov', 'avi', 'mkv']:
+            st.video(uploaded_file)
+        else:
+            st.audio(uploaded_file, format=f'audio/{file_type}')
     
-    if file_type in ['mp4', 'mov', 'avi', 'mkv']:
-        st.video(uploaded_file)
-    else:
-        st.audio(uploaded_file, format=f'audio/{file_type}')
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("🎬 Generate Video"):
-        with st.status("Processing...", expanded=True) as status:
+    # Centered Button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        generate_btn = st.button("✨ Create Magic Video ✨", use_container_width=True)
+
+    if generate_btn:
+        with st.status("🚀 Processing your masterpiece...", expanded=True) as status:
             
             # 1. Save temp input file
-            # We need to preserve extension for tools to recognize format
             ext = "." + file_type
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=ext) 
             tfile.write(uploaded_file.read())
@@ -280,9 +378,7 @@ if uploaded_file is not None:
             
             try:
                 # 2. Analyze Audio
-                status.write("🎵 Analyzing Audio Data (FFT)...")
-                
-                # librosa.load will extract audio from video files automatically via ffmpeg
+                status.write("🎵 Analyzing frequencies and beats...")
                 y, sr, total_duration, rms_norm, spec_norm = get_audio_features(temp_input_path)
                 
                 # Duration Logic
@@ -298,14 +394,13 @@ if uploaded_file is not None:
                     W, H = 1920, 1080
 
                 # 4. Render
-                status.write(f"🎨 Rendering at {W}x{H}...")
+                status.write(f"🎨 Painting frames ({W}x{H})...")
                 
                 def make_frame_wrapper(t):
                     return draw_frame(t, visual_style, rms_norm, spec_norm, sr, W, H)
                 
                 clip = VideoClip(make_frame_wrapper, duration=render_duration)
                 
-                # Extract audio from the input file (works for both audio and video inputs)
                 audio_clip = AudioFileClip(temp_input_path).subclip(0, render_duration)
                 clip = clip.set_audio(audio_clip)
                 
@@ -318,10 +413,12 @@ if uploaded_file is not None:
                     logger=None 
                 )
                 
-                status.update(label="✅ Complete!", state="complete", expanded=False)
+                status.update(label="✅ Your video is ready!", state="complete", expanded=False)
                 
                 # 5. Show Results
-                st.success(f"Video Generated! ({W}x{H})")
+                st.balloons()
+                st.success(f"Done! Created in {resolution_mode}")
+                
                 st.video(output_video_path)
                 
                 with open(output_video_path, "rb") as file:
@@ -329,7 +426,8 @@ if uploaded_file is not None:
                         label="⬇️ Download Video",
                         data=file,
                         file_name="visualizer_video.mp4",
-                        mime="video/mp4"
+                        mime="video/mp4",
+                        use_container_width=True
                     )
 
             except Exception as e:
