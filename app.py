@@ -240,7 +240,7 @@ if uploaded_file is not None:
     
     st.markdown("---")
     st.markdown("### :material/play_circle: Source Preview")
-    p_col1, p_col2, p_col3 = st.columns([1, 2, 1]) 
+    p_col1, p_col2, p_col3 = st.columns([1, 1, 1]) 
     with p_col2:
         if file_type in ['mp4', 'mov']: st.video(uploaded_file)
         else: st.audio(uploaded_file)
@@ -275,7 +275,7 @@ if uploaded_file is not None:
         # --- FINAL RESULTS SECTION (Outside status box for obvious UX) ---
         if os.path.exists(output_video_path):
             st.markdown("---")
-            res_col1, res_col2, res_col3 = st.columns([1, 2, 1])
+            res_col1, res_col2, res_col3 = st.columns([1, 1, 1])
             with res_col2:
                 st.markdown("### :material/check_circle: Your Masterpiece")
                 st.video(output_video_path)
