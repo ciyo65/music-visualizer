@@ -67,7 +67,7 @@ st.markdown("""
         border-radius: 980px; /* Pill shape */
         border: none;
         box-shadow: 0 4px 12px rgba(0,113,227,0.2);
-        transition: transform 0.1s ease, box-shadow 0.2s ease;
+        transition: all 0.2s ease;
         width: 100%;
     }
     .stButton > button:hover {
@@ -75,8 +75,23 @@ st.markdown("""
         transform: scale(1.01);
         box-shadow: 0 6px 16px rgba(0,113,227,0.3);
     }
-    .stButton > button:active {
-        transform: scale(0.98);
+    
+    /* DOWNLOAD BUTTON SPECIAL STYLING */
+    .stDownloadButton > button {
+        background: #34a853 !important; /* Prominent Green */
+        color: white !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        padding: 1rem !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 20px rgba(52, 168, 83, 0.3) !important;
+        border: none !important;
+        width: 100% !important;
+        margin-top: 1rem;
+    }
+    .stDownloadButton > button:hover {
+        background: #2d8e47 !important;
+        transform: translateY(-2px);
     }
 
     /* FILE UPLOADER */
@@ -119,20 +134,16 @@ with col2:
 with st.sidebar:
     st.markdown("### :material/tune: Configuration")
     
-    # Visual Style
     st.markdown("**Visual Theme**")
     style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
     visual_style = st.selectbox("Style", style_options, label_visibility="collapsed")
     
-    # Preview GIF in a clean container
     preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
     if os.path.exists(preview_path):
         st.image(preview_path, use_container_width=True)
         st.caption(f"Preview: {visual_style}")
 
     st.markdown("---")
-    
-    # Resolution
     st.markdown("**Output Quality**")
     resolution_mode = st.selectbox(
         "Resolution",
@@ -141,7 +152,6 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    # Duration
     st.markdown("**Duration**")
     duration_mode = st.radio(
         "Duration", 
@@ -155,14 +165,10 @@ def get_audio_features(file_path):
     duration = librosa.get_duration(y=y, sr=sr)
     hop_length = 512
     rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-    if np.max(rms) > np.min(rms):
-        rms_norm = (rms - np.min(rms)) / (np.max(rms) - np.min(rms))
-    else:
-        rms_norm = rms
+    rms_norm = (rms - np.min(rms)) / (np.max(rms) - np.min(rms)) if np.max(rms) > np.min(rms) else rms
     D = np.abs(librosa.stft(y, n_fft=2048, hop_length=hop_length))
     D_db = librosa.amplitude_to_db(D, ref=np.max)
-    D_db_norm = (D_db + 80) / 80
-    D_db_norm = np.clip(D_db_norm, 0, 1)
+    D_db_norm = np.clip((D_db + 80) / 80, 0, 1)
     return y, sr, duration, rms_norm, D_db_norm
 
 def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
@@ -170,187 +176,116 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
     frame_idx = librosa.time_to_frames(t, sr=sr, hop_length=hop_length)
     vol = rms_norm[frame_idx] if frame_idx < len(rms_norm) else 0
     frame = np.zeros((H, W, 3), dtype=np.uint8)
-    if frame_idx < spec_norm.shape[1]:
-        freq_col = spec_norm[:200, frame_idx]
-    else:
-        freq_col = np.zeros(200)
+    freq_col = spec_norm[:200, frame_idx] if frame_idx < spec_norm.shape[1] else np.zeros(200)
 
     if style == "Pulse Circle":
         bg = int(10 + (vol * 20))
         frame[:] = (bg, bg, bg+5)
         center = (W // 2, H // 2)
-        max_radius = H // 2.5 
-        radius = int((H // 6) + (vol * max_radius))
+        radius = int((H // 6) + (vol * (H // 2.5)))
         Y, X = np.ogrid[:H, :W]
-        dist = np.sqrt((X - center[0])**2 + (Y - center[1])**2)
-        mask = dist <= radius
+        mask = np.sqrt((X - center[0])**2 + (Y - center[1])**2) <= radius
         frame[mask] = [0, int(100 + (vol * 155)), int(200 + (vol * 55))]
     elif style == "Waveform Bars":
-        frame[:] = (0, 0, 0)
         num_bars = 40
         bar_width = W // num_bars
-        gap = 2
         chunk_size = len(freq_col) // num_bars
         for i in range(num_bars):
-            start = i * chunk_size
-            end = start + chunk_size
-            mag = np.mean(freq_col[start:end]) if end > start else 0
+            mag = np.mean(freq_col[i*chunk_size:(i+1)*chunk_size])
             bar_h = int(mag * H * 0.9)
-            x1 = i * bar_width + gap
-            x2 = x1 + bar_width - gap
-            y1 = H - bar_h
-            if y1 < 0: y1 = 0
-            c_r = int(128 * (1 - i/num_bars))
-            c_g = int(255 * (i/num_bars))
-            c_b = 255
-            frame[y1:H, x1:x2] = [c_r, c_g, c_b]
+            x1, x2, y1 = i*bar_width+2, (i+1)*bar_width-2, max(0, H-bar_h)
+            frame[y1:H, x1:x2] = [int(128*(1-i/num_bars)), int(255*(i/num_bars)), 255]
     elif style == "Spectrum Helix":
         frame[:] = (10, 10, 30)
         center_x, center_y = W // 2, H // 2
-        max_radius = min(W, H) // 2 - 20
-        base_radius = 50
-        angle_offset = t * 0.5 
         Y, X = np.ogrid[:H, :W]
         Y, X = Y - center_y, X - center_x
-        R = np.sqrt(X**2 + Y**2)
-        Theta = np.arctan2(Y, X)
-        Theta = (Theta - angle_offset) % (2 * np.pi)
-        freq_indices = (Theta / (2 * np.pi) * len(freq_col)).astype(int)
-        freq_indices = np.clip(freq_indices, 0, len(freq_col)-1)
-        mags = freq_col[freq_indices]
-        outer_limit = base_radius + mags * (max_radius - base_radius) * 1.5
-        mask = (R > base_radius) & (R < outer_limit)
-        hue = (Theta / (2 * np.pi)) 
-        frame[mask, 0] = (np.sin(hue[mask] * 6.28) * 127 + 128).astype(np.uint8)
-        frame[mask, 1] = (np.sin(hue[mask] * 6.28 + 2) * 127 + 128).astype(np.uint8) 
+        R, Theta = np.sqrt(X**2 + Y**2), (np.arctan2(Y, X) - t*0.5) % (2*np.pi)
+        freq_idx = np.clip((Theta/(2*np.pi)*len(freq_col)).astype(int), 0, len(freq_col)-1)
+        mask = (R > 50) & (R < 50 + freq_col[freq_idx]*(min(W,H)//2-70)*1.5)
+        hue = Theta / (2 * np.pi)
+        frame[mask, 0] = (np.sin(hue[mask]*6.28)*127+128).astype(np.uint8)
+        frame[mask, 1] = (np.sin(hue[mask]*6.28+2)*127+128).astype(np.uint8)
         frame[mask, 2] = 255
     elif style == "Galaxy Particles":
         frame[:] = (5, 5, 10)
-        center_x, center_y = W // 2, H // 2
-        np.random.seed(42) 
-        num_stars = 200
-        star_x = np.random.randint(0, W, num_stars)
-        star_y = np.random.randint(0, H, num_stars)
-        bass = np.mean(freq_col[:10]) 
-        zoom = 1.0 + (bass * 0.5)
-        shifted_x = (star_x - center_x) * zoom + center_x
-        shifted_y = (star_y - center_y) * zoom + center_y
-        valid = (shifted_x >= 0) & (shifted_x < W) & (shifted_y >= 0) & (shifted_y < H)
-        sx = shifted_x[valid].astype(int)
-        sy = shifted_y[valid].astype(int)
-        frame[sy, sx] = [255, 255, 200]
-        core_radius = int(50 * (1 + vol))
+        np.random.seed(42)
+        star_x, star_y = np.random.randint(0, W, 200), np.random.randint(0, H, 200)
+        zoom = 1.0 + (np.mean(freq_col[:10]) * 0.5)
+        sx, sy = ((star_x-W//2)*zoom+W//2).astype(int), ((star_y-H//2)*zoom+H//2).astype(int)
+        valid = (sx>=0)&(sx<W)&(sy>=0)&(sy<H)
+        frame[sy[valid], sx[valid]] = [255, 255, 200]
         Y, X = np.ogrid[:H, :W]
-        dist = np.sqrt((X - center_x)**2 + (Y - center_y)**2)
-        glow_mask = dist < (core_radius * 2)
+        dist = np.sqrt((X-W//2)**2 + (Y-H//2)**2)
+        glow_mask = dist < 50*(1+vol)*2
         if np.any(glow_mask):
-            alpha = 1 - (dist[glow_mask] / (core_radius * 2))
-            alpha = np.clip(alpha, 0, 1)
-            frame[glow_mask, 0] = np.clip(frame[glow_mask, 0] + alpha * 255 * vol, 0, 255)
-            frame[glow_mask, 1] = np.clip(frame[glow_mask, 1] + alpha * 100 * vol, 0, 255) 
-            frame[glow_mask, 2] = np.clip(frame[glow_mask, 2] + alpha * 200 * vol, 0, 255) 
+            alpha = np.clip(1-(dist[glow_mask]/(50*(1+vol)*2)), 0, 1)
+            frame[glow_mask, 0] = np.clip(frame[glow_mask,0]+alpha*255*vol, 0, 255)
+            frame[glow_mask, 1] = np.clip(frame[glow_mask,1]+alpha*100*vol, 0, 255)
+            frame[glow_mask, 2] = np.clip(frame[glow_mask,2]+alpha*200*vol, 0, 255)
     elif style == "Minimal Flash":
         c = 255 if vol > 0.65 else int(vol * 40)
         frame[:] = (c, c, c)
     return frame
 
 # --- MAIN LAYOUT ---
-
-# 1. UPLOAD SECTION
-# Using 3 columns to center the upload box and prevent it from being too wide
 u_col1, u_col2, u_col3 = st.columns([1, 2, 1])
 with u_col2:
-    uploaded_file = st.file_uploader(
-        "Upload Audio", 
-        type=["mp3", "wav", "ogg", "flac", "aac", "m4a", "mp4", "mov", "avi", "mkv"],
-        label_visibility="collapsed"
-    )
+    uploaded_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "mp4", "mov", "m4a"], label_visibility="collapsed")
     if not uploaded_file:
-        st.info("👆 Drag & drop an audio file to get started")
+        st.info("👆 Upload a file to generate your visualization")
 
 if uploaded_file is not None:
-    # 2. PREVIEW SECTION
+    file_type = uploaded_file.name.split('.')[-1].lower()
+    
     st.markdown("---")
     st.markdown("### :material/play_circle: Source Preview")
-    
-    # Grid layout to constrain preview size (Proportion fix)
     p_col1, p_col2, p_col3 = st.columns([1, 2, 1]) 
     with p_col2:
-        file_type = uploaded_file.name.split('.')[-1].lower()
-        if file_type in ['mp4', 'mov', 'avi', 'mkv']:
-            st.video(uploaded_file)
-        else:
-            st.audio(uploaded_file, format=f'audio/{file_type}')
+        if file_type in ['mp4', 'mov']: st.video(uploaded_file)
+        else: st.audio(uploaded_file)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 3. ACTION SECTION
     b_col1, b_col2, b_col3 = st.columns([1, 1, 1])
     with b_col2:
         generate_btn = st.button("Generate Video", icon="✨", use_container_width=True)
 
     if generate_btn:
-        # Create a container for the process to isolate it visually
-        process_container = st.container()
-        
-        with process_container:
-             with st.status("Processing your masterpiece...", expanded=True) as status:
-                ext = "." + file_type
-                tfile = tempfile.NamedTemporaryFile(delete=False, suffix=ext) 
-                tfile.write(uploaded_file.read())
-                temp_input_path = tfile.name
-                tfile.close() 
-                output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
+        output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
+        with st.status("🚀 Processing...", expanded=True) as status:
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix="."+file_type) 
+            tfile.write(uploaded_file.read()); temp_input_path = tfile.name; tfile.close()
+            try:
+                y, sr, dur, rms, spec = get_audio_features(temp_input_path)
+                rend_dur = 30 if duration_mode == "Preview (30s)" else dur
+                if resolution_mode == "Mobile Low (480p)": W, H = 854, 480
+                elif resolution_mode == "HD (720p)": W, H = 1280, 720
+                else: W, H = 1920, 1080
                 
-                try:
-                    status.write(":material/analytics: Analyzing audio spectrum...")
-                    y, sr, total_duration, rms_norm, spec_norm = get_audio_features(temp_input_path)
-                    
-                    render_duration = 30 if duration_mode == "Preview (30s)" else total_duration
-                    if render_duration > total_duration: render_duration = total_duration
-                    
-                    if resolution_mode == "Mobile Low (480p)": W, H = 854, 480
-                    elif resolution_mode == "HD (720p)": W, H = 1280, 720
-                    else: W, H = 1920, 1080
-                    
-                    status.write(f":material/brush: Rendering visuals ({W}x{H})...")
-                    def make_frame_wrapper(t):
-                        return draw_frame(t, visual_style, rms_norm, spec_norm, sr, W, H)
-                    
-                    clip = VideoClip(make_frame_wrapper, duration=render_duration)
-                    audio_clip = AudioFileClip(temp_input_path).subclip(0, render_duration)
-                    clip = clip.set_audio(audio_clip)
-                    
-                    clip.write_videofile(
-                        output_video_path, 
-                        fps=24, 
-                        codec='libx264', 
-                        audio_codec='aac', 
-                        preset='ultrafast',
-                        logger=None
+                def mf(t): return draw_frame(t, visual_style, rms, spec, sr, W, H)
+                clip = VideoClip(mf, duration=rend_dur)
+                audio = AudioFileClip(temp_input_path).subclip(0, rend_dur)
+                clip.set_audio(audio).write_videofile(output_video_path, fps=24, codec='libx264', audio_codec='aac', preset='ultrafast', logger=None)
+                status.update(label="✅ Rendering Complete!", state="complete", expanded=False)
+                st.balloons()
+            except Exception as e: st.error(f"Error: {e}")
+            finally: 
+                if os.path.exists(temp_input_path): os.remove(temp_input_path)
+
+        # --- FINAL RESULTS SECTION (Outside status box for obvious UX) ---
+        if os.path.exists(output_video_path):
+            st.markdown("---")
+            res_col1, res_col2, res_col3 = st.columns([1, 2, 1])
+            with res_col2:
+                st.markdown("### :material/check_circle: Your Masterpiece")
+                st.video(output_video_path)
+                
+                with open(output_video_path, "rb") as f:
+                    st.download_button(
+                        label="DOWNLOAD VIDEO",
+                        data=f,
+                        file_name="visualizer.mp4",
+                        mime="video/mp4",
+                        use_container_width=True
                     )
-                    
-                    status.update(label="Complete!", state="complete", expanded=False)
-                    st.balloons()
-                    
-                    # 4. RESULT SECTION (Centered and constrained)
-                    st.markdown("### :material/movie: Final Render")
-                    r_col1, r_col2, r_col3 = st.columns([1, 2, 1])
-                    with r_col2:
-                        st.video(output_video_path)
-                        
-                        with open(output_video_path, "rb") as file:
-                            st.download_button(
-                                label="Download Video",
-                                data=file,
-                                file_name="visualizer_video.mp4",
-                                mime="video/mp4",
-                                icon=":material/download:",
-                                use_container_width=True
-                            )
-                            
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-                finally:
-                    if os.path.exists(temp_input_path):
-                        os.remove(temp_input_path)
+                st.markdown("<p style='text-align:center; color:#86868b;'>Ready to share!</p>", unsafe_allow_html=True)
