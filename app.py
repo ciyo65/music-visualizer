@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="Music Visualizer",
     page_icon=":material/equalizer:",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Better for mobile-first
 )
 
 # --- PREMIUM UI CSS ---
@@ -23,14 +23,12 @@ st.markdown("""
         color: #1d1d1f;
     }
     
-    /* Remove default streamlit junk */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Background */
     .stApp {
-        background-color: #fbfbfd; /* Apple-like off-white */
+        background-color: #fbfbfd;
     }
 
     /* CARD COMPONENT */
@@ -43,131 +41,58 @@ st.markdown("""
         margin-bottom: 24px;
     }
     
-    /* HEADERS */
     h1 {
         font-weight: 700;
         letter-spacing: -0.02em;
-        font-size: 2.5rem;
+        font-size: 2.2rem;
         margin-bottom: 0.5rem;
     }
-    h3 {
-        font-weight: 600;
-        font-size: 1.2rem;
-        margin-bottom: 1rem;
-        color: #86868b;
-    }
     
-    /* BUTTONS */
     .stButton > button {
-        background: #0071e3; /* Apple Blue */
+        background: #0071e3;
         color: white;
-        font-weight: 500;
-        font-size: 1rem;
-        padding: 0.75rem 1.5rem;
-        border-radius: 980px; /* Pill shape */
+        font-weight: 600;
+        border-radius: 980px;
+        padding: 0.8rem 1.5rem;
         border: none;
-        box-shadow: 0 4px 12px rgba(0,113,227,0.2);
-        transition: all 0.2s ease;
         width: 100%;
     }
-    .stButton > button:hover {
-        background: #0077ed;
-        transform: scale(1.01);
-        box-shadow: 0 6px 16px rgba(0,113,227,0.3);
-    }
     
-    /* DOWNLOAD BUTTON SPECIAL STYLING */
     .stDownloadButton > button {
-        background: #34a853 !important; /* Prominent Green */
+        background: #34a853 !important;
         color: white !important;
         font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        padding: 1rem !important;
         border-radius: 12px !important;
-        box-shadow: 0 10px 20px rgba(52, 168, 83, 0.3) !important;
-        border: none !important;
+        padding: 1rem !important;
         width: 100% !important;
-        margin-top: 1rem;
-    }
-    .stDownloadButton > button:hover {
-        background: #2d8e47 !important;
-        transform: translateY(-2px);
     }
 
-    /* FILE UPLOADER */
-    [data-testid="stFileUploader"] {
-        padding: 2rem;
-        border: 2px dashed #d2d2d7;
-        border-radius: 12px;
-        background-color: #f5f5f7;
-        text-align: center;
-        transition: border-color 0.2s;
-    }
-    [data-testid="stFileUploader"]:hover {
-        border-color: #0071e3;
-    }
-
-    /* SIDEBAR */
-    [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #f0f0f0;
-    }
-    
-    /* VIDEO/AUDIO CONTAINERS */
-    .stVideo, .stAudio {
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    /* Mobile specific tweaks */
+    @media (max-width: 768px) {
+        h1 { font-size: 1.8rem; }
+        .stButton > button { padding: 1rem; }
     }
     
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER SECTION ---
-col1, col2, col3 = st.columns([1, 6, 1])
-with col2:
-    st.markdown("<h1 style='text-align: center;'>AI Music Visualizer</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #86868b; font-size: 1.1rem;'>Transform your audio into studio-quality reactive visuals.</p>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>AI Music Visualizer</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #86868b;'>Turn audio into reactive visuals in seconds.</p>", unsafe_allow_html=True)
 
-# --- SIDEBAR (SETTINGS) ---
+# --- ADVANCED SETTINGS (SIDEBAR) ---
 with st.sidebar:
-    st.markdown("### :material/tune: Configuration")
-    
-    st.markdown("**Visual Theme**")
-    style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
-    visual_style = st.selectbox("Style", style_options, label_visibility="collapsed")
-    
-    preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
-    if os.path.exists(preview_path):
-        st.image(preview_path, use_container_width=True)
-        st.caption(f"Preview: {visual_style}")
-
-    st.markdown("---")
-    st.markdown("**Output Quality**")
+    st.markdown("### :material/settings: Advanced")
     resolution_mode = st.selectbox(
         "Resolution",
         ["Mobile Low (480p)", "HD (720p)", "Full HD (1080p)"],
-        index=0,
-        label_visibility="collapsed"
+        index=0
     )
-    
-    st.markdown("**Where will you publish?**")
-    platform_preset = st.selectbox(
-        "Platform",
-        ["YouTube & TV (Wide)", "TikTok, Reels & Shorts (Vertical)"],
-        index=0,
-        help="Select the platform to optimize the video size.",
-        label_visibility="collapsed"
-    )
-    orientation = "Portrait (9:16)" if "TikTok" in platform_preset else "Landscape (16:9)"
-    
-    st.markdown("**Duration**")
     duration_mode = st.radio(
         "Duration", 
-        ["Preview (30s)", "Full Song"],
-        label_visibility="collapsed"
+        ["Preview (30s)", "Full Song"]
     )
+    st.info("💡 Pro Tip: Use 'Mobile Low' for faster rendering on phone.")
 
 # --- AUDIO PROCESSING FUNCTIONS ---
 def get_audio_features(file_path):
@@ -189,50 +114,38 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
     freq_col = spec_norm[:200, frame_idx] if frame_idx < spec_norm.shape[1] else np.zeros(200)
 
     if style == "Pulse Circle":
-        bg = int(10 + (vol * 20))
-        frame[:] = (bg, bg, bg+5)
+        bg = int(10 + (vol * 20)); frame[:] = (bg, bg, bg+5)
         center = (W // 2, H // 2)
-        # Dynamic radius scaling based on min dimension
-        min_dim = min(W, H)
-        radius = int((min_dim // 6) + (vol * (min_dim // 2.5)))
+        dim = min(W, H)
+        radius = int((dim // 6) + (vol * (dim // 2.5)))
         Y, X = np.ogrid[:H, :W]
         mask = np.sqrt((X - center[0])**2 + (Y - center[1])**2) <= radius
         frame[mask] = [0, int(100 + (vol * 155)), int(200 + (vol * 55))]
     elif style == "Waveform Bars":
-        num_bars = 40
-        bar_width = W // num_bars
-        chunk_size = len(freq_col) // num_bars
+        num_bars = 40; bar_width = W // num_bars; chunk_size = len(freq_col) // num_bars
         for i in range(num_bars):
             mag = np.mean(freq_col[i*chunk_size:(i+1)*chunk_size])
             bar_h = int(mag * H * 0.9)
             x1, x2, y1 = i*bar_width+2, (i+1)*bar_width-2, max(0, H-bar_h)
             frame[y1:H, x1:x2] = [int(128*(1-i/num_bars)), int(255*(i/num_bars)), 255]
     elif style == "Spectrum Helix":
-        frame[:] = (10, 10, 30)
-        center_x, center_y = W // 2, H // 2
-        Y, X = np.ogrid[:H, :W]
-        Y, X = Y - center_y, X - center_x
+        frame[:] = (10, 10, 30); center_x, center_y = W // 2, H // 2
+        Y, X = np.ogrid[:H, :W]; Y, X = Y - center_y, X - center_x
         R, Theta = np.sqrt(X**2 + Y**2), (np.arctan2(Y, X) - t*0.5) % (2*np.pi)
         freq_idx = np.clip((Theta/(2*np.pi)*len(freq_col)).astype(int), 0, len(freq_col)-1)
-        
-        min_dim = min(W, H)
-        max_dist = min_dim // 2 - 20
-        mask = (R > 50) & (R < 50 + freq_col[freq_idx]*(max_dist-50)*1.5)
-        
+        mask = (R > 50) & (R < 50 + freq_col[freq_idx]*(min(W,H)//2-20)*1.5)
         hue = Theta / (2 * np.pi)
         frame[mask, 0] = (np.sin(hue[mask]*6.28)*127+128).astype(np.uint8)
         frame[mask, 1] = (np.sin(hue[mask]*6.28+2)*127+128).astype(np.uint8)
         frame[mask, 2] = 255
     elif style == "Galaxy Particles":
-        frame[:] = (5, 5, 10)
-        np.random.seed(42)
+        frame[:] = (5, 5, 10); np.random.seed(42)
         star_x, star_y = np.random.randint(0, W, 200), np.random.randint(0, H, 200)
         zoom = 1.0 + (np.mean(freq_col[:10]) * 0.5)
         sx, sy = ((star_x-W//2)*zoom+W//2).astype(int), ((star_y-H//2)*zoom+H//2).astype(int)
         valid = (sx>=0)&(sx<W)&(sy>=0)&(sy<H)
         frame[sy[valid], sx[valid]] = [255, 255, 200]
-        Y, X = np.ogrid[:H, :W]
-        dist = np.sqrt((X-W//2)**2 + (Y-H//2)**2)
+        Y, X = np.ogrid[:H, :W]; dist = np.sqrt((X-W//2)**2 + (Y-H//2)**2)
         glow_mask = dist < 50*(1+vol)*2
         if np.any(glow_mask):
             alpha = np.clip(1-(dist[glow_mask]/(50*(1+vol)*2)), 0, 1)
@@ -240,86 +153,98 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
             frame[glow_mask, 1] = np.clip(frame[glow_mask,1]+alpha*100*vol, 0, 255)
             frame[glow_mask, 2] = np.clip(frame[glow_mask,2]+alpha*200*vol, 0, 255)
     elif style == "Minimal Flash":
-        c = 255 if vol > 0.65 else int(vol * 40)
-        frame[:] = (c, c, c)
+        c = 255 if vol > 0.65 else int(vol * 40); frame[:] = (c, c, c)
     return frame
 
-# --- MAIN LAYOUT ---
-u_col1, u_col2, u_col3 = st.columns([1, 2, 1])
-with u_col2:
-    uploaded_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "mp4", "mov", "m4a"], label_visibility="collapsed")
-    if not uploaded_file:
-        st.info("👆 Upload a file to generate your visualization")
+# --- MAIN CONTENT FLOW ---
+m_col1, m_col2, m_col3 = st.columns([1, 2, 1])
 
-if uploaded_file is not None:
-    file_type = uploaded_file.name.split('.')[-1].lower()
+with m_col2:
+    # 1. UPLOAD
+    uploaded_file = st.file_uploader(
+        "Upload Audio", 
+        type=["mp3", "wav", "mp4", "mov", "m4a"],
+        label_visibility="collapsed"
+    )
     
-    st.markdown("---")
-    st.markdown("### :material/play_circle: Source Preview")
-    p_col1, p_col2, p_col3 = st.columns([1, 1, 1]) 
-    with p_col2:
+    if uploaded_file:
+        file_type = uploaded_file.name.split('.')[-1].lower()
+        st.markdown("---")
+        
+        # 2. SOURCE PREVIEW
+        st.markdown("### :material/play_circle: Preview Source")
         if file_type in ['mp4', 'mov']: st.video(uploaded_file)
         else: st.audio(uploaded_file)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    b_col1, b_col2, b_col3 = st.columns([1, 1, 1])
-    with b_col2:
-        generate_btn = st.button("Generate Video", icon="✨", use_container_width=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 3. CORE SETTINGS (Moved to Main Page for Mobile)
+        st.markdown("### :material/palette: Design Studio")
+        
+        # Style with Preview
+        style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
+        visual_style = st.selectbox("Choose Visual Theme", style_options)
+        
+        preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
+        if os.path.exists(preview_path):
+            st.image(preview_path, use_container_width=True)
+        
+        # Platform
+        platform_preset = st.selectbox(
+            "Where will you publish?",
+            ["YouTube & TV (Wide)", "TikTok, Reels & Shorts (Vertical)"]
+        )
+        orientation = "Portrait (9:16)" if "TikTok" in platform_preset else "Landscape (16:9)"
 
-    if generate_btn:
-        output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
-        with st.status("🚀 Processing...", expanded=True) as status:
-            tfile = tempfile.NamedTemporaryFile(delete=False, suffix="."+file_type) 
-            tfile.write(uploaded_file.read()); temp_input_path = tfile.name; tfile.close()
-            try:
-                y, sr, dur, rms, spec = get_audio_features(temp_input_path)
-                rend_dur = 30 if duration_mode == "Preview (30s)" else dur
-                if resolution_mode == "Mobile Low (480p)": W, H = 854, 480
-                elif resolution_mode == "HD (720p)": W, H = 1280, 720
-                else: W, H = 1920, 1080
-                
-                # Aspect Ratio Logic
-                if orientation == "Portrait (9:16)":
-                    W, H = H, W
-                
-                def mf(t): return draw_frame(t, visual_style, rms, spec, sr, W, H)
-                clip = VideoClip(mf, duration=rend_dur)
-                audio = AudioFileClip(temp_input_path).subclip(0, rend_dur)
-                clip.set_audio(audio).write_videofile(output_video_path, fps=24, codec='libx264', audio_codec='aac', preset='ultrafast', logger=None)
-                status.update(label="✅ Rendering Complete!", state="complete", expanded=False)
-                st.balloons()
-            except Exception as e: st.error(f"Error: {e}")
-            finally: 
-                if os.path.exists(temp_input_path): os.remove(temp_input_path)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 4. GENERATE
+        generate_btn = st.button("Generate Video", icon="✨")
 
-        # --- FINAL RESULTS SECTION (Outside status box for obvious UX) ---
-        if os.path.exists(output_video_path):
-            st.markdown("---")
-            res_col1, res_col2, res_col3 = st.columns([1, 1, 1])
-            with res_col2:
+        if generate_btn:
+            output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
+            with st.status("🚀 Creating magic...", expanded=True) as status:
+                tfile = tempfile.NamedTemporaryFile(delete=False, suffix="."+file_type) 
+                tfile.write(uploaded_file.read()); temp_input_path = tfile.name; tfile.close()
+                try:
+                    y, sr, dur, rms, spec = get_audio_features(temp_input_path)
+                    rend_dur = 30 if duration_mode == "Preview (30s)" else dur
+                    if resolution_mode == "Mobile Low (480p)": W, H = 854, 480
+                    elif resolution_mode == "HD (720p)": W, H = 1280, 720
+                    else: W, H = 1920, 1080
+                    if orientation == "Portrait (9:16)": W, H = H, W
+                    
+                    def mf(t): return draw_frame(t, visual_style, rms, spec, sr, W, H)
+                    clip = VideoClip(mf, duration=rend_dur)
+                    audio = AudioFileClip(temp_input_path).subclip(0, rend_dur)
+                    clip.set_audio(audio).write_videofile(output_video_path, fps=24, codec='libx264', audio_codec='aac', preset='ultrafast', logger=None)
+                    status.update(label="✅ Ready!", state="complete", expanded=False)
+                    st.balloons()
+                except Exception as e: st.error(f"Error: {e}")
+                finally: 
+                    if os.path.exists(temp_input_path): os.remove(temp_input_path)
+
+            # 5. RESULTS
+            if os.path.exists(output_video_path):
+                st.markdown("---")
                 st.markdown("### :material/check_circle: Your Masterpiece")
                 st.video(output_video_path)
                 
-                # Main Download
                 with open(output_video_path, "rb") as f:
                     st.download_button(
                         label="DOWNLOAD VIDEO",
                         data=f,
                         file_name="visualizer.mp4",
-                        mime="video/mp4",
-                        use_container_width=True
+                        mime="video/mp4"
                     )
                 
-                # Social Share Shortcuts
+                # SHARE
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("### :material/share: Share Your Creation")
+                st.markdown("### :material/share: Share")
                 s_col1, s_col2, s_col3 = st.columns(3)
-                
-                with s_col1:
-                    st.link_button("YouTube", "https://studio.youtube.com", icon=":material/smart_display:", use_container_width=True)
-                with s_col2:
-                    st.link_button("TikTok", "https://www.tiktok.com/upload", icon=":material/music_note:", use_container_width=True)
-                with s_col3:
-                    st.link_button("Instagram", "https://www.instagram.com/", icon=":material/photo_camera:", use_container_width=True)
-                
-                st.markdown("<p style='text-align:center; color:#86868b; font-size: 0.9rem; margin-top:10px;'>Download first, then click a platform to upload!</p>", unsafe_allow_html=True)
+                s_col1.link_button("YouTube", "https://studio.youtube.com", icon=":material/smart_display:", use_container_width=True)
+                s_col2.link_button("TikTok", "https://www.tiktok.com/upload", icon=":material/music_note:", use_container_width=True)
+                s_col3.link_button("Instagram", "https://www.instagram.com/", icon=":material/photo_camera:", use_container_width=True)
+    else:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.info("💡 Note: You can adjust Resolution and Duration in the sidebar menu.")
