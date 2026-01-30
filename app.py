@@ -18,10 +18,16 @@ with st.sidebar:
     st.header("⚙️ Settings")
     
     # 1. Visual Style
+    style_options = ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
     visual_style = st.selectbox(
         "Choose Visual Style",
-        ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
+        style_options
     )
+    
+    # Show Preview GIF
+    preview_path = f"assets/{visual_style.lower().replace(' ', '_')}.gif"
+    if os.path.exists(preview_path):
+        st.image(preview_path, caption=f"Preview: {visual_style}", use_container_width=True)
     
     # 2. Resolution (Crucial for Cloud Stability)
     resolution_mode = st.selectbox(
@@ -147,45 +153,6 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
         # Rotate the whole helix over time
         angle_offset = t * 0.5 
         
-        for i in range(num_lines):
-            # Get magnitude
-            idx = i * chunk_size
-            if idx < len(freq_col):
-                mag = freq_col[idx]
-            else:
-                mag = 0
-            
-            # Calculate angle
-            angle = angle_offset + (i / num_lines) * 2 * np.pi
-            
-            # Line length based on magnitude
-            line_len = int(mag * (max_radius - base_radius))
-            
-            # Start and End points
-            x_start = int(center_x + math.cos(angle) * base_radius)
-            y_start = int(center_y + math.sin(angle) * base_radius)
-            
-            x_end = int(center_x + math.cos(angle) * (base_radius + line_len))
-            y_end = int(center_y + math.sin(angle) * (base_radius + line_len))
-            
-            # Draw approx line using Bresenham algorithm or simplified iteration (for pure numpy)
-            # Since numpy doesn't have a draw_line, we can simulate thick points or use RR 
-            # But RR (skimage.draw.line) isn't imported. 
-            # Let's use a simpler approach: multiple dots or small rectangles along the path.
-            # OR better: a simple "fan" of pixels if we want pure numpy speed, 
-            # but for clarity let's just draw a small block at the end position for a "particle ring" effect
-            # to keep it fast without CV2/PIL.
-            
-            # Let's draw "rays" using a mask for a wedge? No, too slow.
-            # Let's simple fill a small rectangular area at the calculated position?
-            
-            # Let's implement a simple line drawer:
-            # Actually, standard python loops are slow for pixels. 
-            # A vectorized approach for "Helix" is better:
-            # Create a radial grid.
-            
-            pass # We will use a vectorized approach below loop
-            
         # Vectorized Helix
         Y, X = np.ogrid[:H, :W]
         # Coordinates relative to center
