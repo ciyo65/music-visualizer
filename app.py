@@ -4,6 +4,7 @@ import numpy as np
 import tempfile
 import os
 import uuid
+import math
 from moviepy.editor import VideoClip, AudioFileClip
 
 # --- APP CONFIGURATION ---
@@ -19,7 +20,7 @@ with st.sidebar:
     # 1. Visual Style
     visual_style = st.selectbox(
         "Choose Visual Style",
-        ["Pulse Circle", "Waveform Bars", "Minimal Flash"]
+        ["Pulse Circle", "Waveform Bars", "Spectrum Helix", "Galaxy Particles", "Minimal Flash"]
     )
     
     # 2. Resolution (Crucial for Cloud Stability)
@@ -75,6 +76,12 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
 
     # Initialize Canvas
     frame = np.zeros((H, W, 3), dtype=np.uint8)
+    
+    # Common spectrogram data retrieval
+    if frame_idx < spec_norm.shape[1]:
+        freq_col = spec_norm[:200, frame_idx] # First 200 bins
+    else:
+        freq_col = np.zeros(200)
 
     if style == "Pulse Circle":
         # Dynamic Background
@@ -101,17 +108,6 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
         bar_width = W // num_bars
         gap = 2
         
-        # Get frequency column for this frame
-        if frame_idx < spec_norm.shape[1]:
-            # spec_norm shape is (1025, num_frames)
-            # We want to ignore the very high frequencies (top of the spectrogram) 
-            # as they are often empty or noise. Let's use the first 200 bins.
-            freq_col = spec_norm[:200, frame_idx] 
-        else:
-            freq_col = np.zeros(200)
-
-        # Resample frequency bins to number of bars
-        # We can just split the array into 'num_bars' chunks and average them
         chunk_size = len(freq_col) // num_bars
         
         for i in range(num_bars):
@@ -128,10 +124,157 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
             y1 = H - bar_h
             if y1 < 0: y1 = 0
             
-            # Gradient color: Low freqs (left) = Blue/Green, High freqs (right) = Red/Yellow
-            # Simple static green for now as requested, or dynamic:
-            # color = [int(i/num_bars * 255), 255 - int(i/num_bars * 255), 150]
-            frame[y1:H, x1:x2] = [0, 255, 100]
+            # Use a colorful gradient: Purple -> Blue -> Cyan
+            c_r = int(128 * (1 - i/num_bars))
+            c_g = int(255 * (i/num_bars))
+            c_b = 255
+            
+            frame[y1:H, x1:x2] = [c_r, c_g, c_b]
+
+    elif style == "Spectrum Helix":
+        # Dark blue background
+        frame[:] = (10, 10, 30)
+        
+        center_x, center_y = W // 2, H // 2
+        num_lines = 60
+        max_radius = min(W, H) // 2 - 20
+        base_radius = 50
+        
+        # Resample freq_col to num_lines
+        chunk_size = len(freq_col) // num_lines
+        if chunk_size < 1: chunk_size = 1
+        
+        # Rotate the whole helix over time
+        angle_offset = t * 0.5 
+        
+        for i in range(num_lines):
+            # Get magnitude
+            idx = i * chunk_size
+            if idx < len(freq_col):
+                mag = freq_col[idx]
+            else:
+                mag = 0
+            
+            # Calculate angle
+            angle = angle_offset + (i / num_lines) * 2 * np.pi
+            
+            # Line length based on magnitude
+            line_len = int(mag * (max_radius - base_radius))
+            
+            # Start and End points
+            x_start = int(center_x + math.cos(angle) * base_radius)
+            y_start = int(center_y + math.sin(angle) * base_radius)
+            
+            x_end = int(center_x + math.cos(angle) * (base_radius + line_len))
+            y_end = int(center_y + math.sin(angle) * (base_radius + line_len))
+            
+            # Draw approx line using Bresenham algorithm or simplified iteration (for pure numpy)
+            # Since numpy doesn't have a draw_line, we can simulate thick points or use RR 
+            # But RR (skimage.draw.line) isn't imported. 
+            # Let's use a simpler approach: multiple dots or small rectangles along the path.
+            # OR better: a simple "fan" of pixels if we want pure numpy speed, 
+            # but for clarity let's just draw a small block at the end position for a "particle ring" effect
+            # to keep it fast without CV2/PIL.
+            
+            # Let's draw "rays" using a mask for a wedge? No, too slow.
+            # Let's simple fill a small rectangular area at the calculated position?
+            
+            # Let's implement a simple line drawer:
+            # Actually, standard python loops are slow for pixels. 
+            # A vectorized approach for "Helix" is better:
+            # Create a radial grid.
+            
+            pass # We will use a vectorized approach below loop
+            
+        # Vectorized Helix
+        Y, X = np.ogrid[:H, :W]
+        # Coordinates relative to center
+        Y, X = Y - center_y, X - center_x
+        # Convert to polar
+        R = np.sqrt(X**2 + Y**2)
+        Theta = np.arctan2(Y, X)
+        
+        # Normalize Theta to 0..2PI
+        Theta = (Theta - angle_offset) % (2 * np.pi)
+        
+        # Map angle to frequency index
+        # 0..2PI -> 0..len(freq_col)
+        freq_indices = (Theta / (2 * np.pi) * len(freq_col)).astype(int)
+        freq_indices = np.clip(freq_indices, 0, len(freq_col)-1)
+        
+        # Get magnitudes for all pixels based on angle
+        mags = freq_col[freq_indices]
+        
+        # Define ring boundaries
+        # Pixels are "on" if R is between base_radius and (base + mag * max_scale)
+        outer_limit = base_radius + mags * (max_radius - base_radius) * 1.5
+        
+        mask = (R > base_radius) & (R < outer_limit)
+        
+        # Coloring based on angle
+        # Simple colorful map
+        hue = (Theta / (2 * np.pi)) 
+        # R = sin(hue), G = sin(hue + 1/3), B = sin(hue + 2/3) approx
+        
+        frame[mask, 0] = (np.sin(hue[mask] * 6.28) * 127 + 128).astype(np.uint8)
+        frame[mask, 1] = (np.sin(hue[mask] * 6.28 + 2) * 127 + 128).astype(np.uint8) 
+        frame[mask, 2] = 255
+        
+    elif style == "Galaxy Particles":
+        # Starfield background
+        frame[:] = (5, 5, 10)
+        
+        # Use a pseudo-random number generator seeded with time for consistency across frames?
+        # No, for particles we want continuity. But since we don't have state persistence across frames in this simple func,
+        # we can simulate "random" positions based on hashing coordinates or simple noise.
+        # However, for a "Galaxy" effect that pulses with music, we can use a static set of stars 
+        # that scale out from center based on bass.
+        
+        center_x, center_y = W // 2, H // 2
+        
+        # Generate static star positions based on a fixed seed
+        np.random.seed(42) 
+        num_stars = 200
+        star_x = np.random.randint(0, W, num_stars)
+        star_y = np.random.randint(0, H, num_stars)
+        star_sizes = np.random.randint(1, 4, num_stars)
+        
+        # Bass kick factor (low frequencies)
+        bass = np.mean(freq_col[:10]) 
+        zoom = 1.0 + (bass * 0.5)
+        
+        # Shift stars away from center based on zoom
+        # (X - cx) * zoom + cx
+        shifted_x = (star_x - center_x) * zoom + center_x
+        shifted_y = (star_y - center_y) * zoom + center_y
+        
+        # Filter out of bounds
+        valid = (shifted_x >= 0) & (shifted_x < W) & (shifted_y >= 0) & (shifted_y < H)
+        
+        sx = shifted_x[valid].astype(int)
+        sy = shifted_y[valid].astype(int)
+        
+        # Draw stars
+        # Since we can't easily loop, let's just set pixels. 
+        # For larger stars, we'd need a loop or dilation, but single pixels are fine for "distant stars"
+        frame[sy, sx] = [255, 255, 200]
+        
+        # Add a central "Core" that glows with volume
+        core_radius = int(50 * (1 + vol))
+        Y, X = np.ogrid[:H, :W]
+        dist = np.sqrt((X - center_x)**2 + (Y - center_y)**2)
+        
+        # Soft glow
+        glow_mask = dist < (core_radius * 2)
+        if np.any(glow_mask):
+            # Inverse distance weighting for alpha
+            alpha = 1 - (dist[glow_mask] / (core_radius * 2))
+            alpha = np.clip(alpha, 0, 1)
+            
+            # Additive blending
+            frame[glow_mask, 0] = np.clip(frame[glow_mask, 0] + alpha * 255 * vol, 0, 255) # Red
+            frame[glow_mask, 1] = np.clip(frame[glow_mask, 1] + alpha * 100 * vol, 0, 255) # Orange-ish
+            frame[glow_mask, 2] = np.clip(frame[glow_mask, 2] + alpha * 200 * vol, 0, 255) # Purple tint
 
     elif style == "Minimal Flash":
         c = 255 if vol > 0.65 else int(vol * 40)
