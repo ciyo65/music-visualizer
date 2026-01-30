@@ -1,4 +1,4 @@
 streamlit
-moviepy
+moviepy<2.0
 librosa
 numpy
