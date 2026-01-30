@@ -10,7 +10,7 @@ from moviepy.editor import VideoClip, AudioFileClip
 st.set_page_config(page_title="Music Visualizer", page_icon="🎵")
 
 st.title("🎵 AI Music Visualizer")
-st.write("Upload a track, pick a style, and generate your video.")
+st.write("Upload a track (MP3, WAV, AAC, etc.) or video (MP4, MOV), pick a style, and generate your video.")
 
 # --- SIDEBAR SETTINGS ---
 with st.sidebar:
@@ -37,6 +37,7 @@ with st.sidebar:
 # --- AUDIO PROCESSING ---
 def get_audio_features(file_path):
     """Loads audio and returns volume (RMS) and frequency spectrogram."""
+    # librosa.load supports wav, mp3, ogg, au, flac, etc. (via ffmpeg)
     y, sr = librosa.load(file_path)
     duration = librosa.get_duration(y=y, sr=sr)
     
@@ -139,25 +140,39 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
     return frame
 
 # --- MAIN LOGIC ---
-uploaded_file = st.file_uploader("Choose an MP3 file", type=["mp3"])
+uploaded_file = st.file_uploader(
+    "Choose a file (Audio or Video)", 
+    type=["mp3", "wav", "ogg", "flac", "aac", "m4a", "mp4", "mov", "avi", "mkv"]
+)
 
 if uploaded_file is not None:
-    st.audio(uploaded_file, format='audio/mp3')
+    # Display audio player regardless of format (streamlit converts internally or browser handles it)
+    # For video files, st.audio works if it has an audio track, but st.video is better for previewing input video.
+    file_type = uploaded_file.name.split('.')[-1].lower()
+    
+    if file_type in ['mp4', 'mov', 'avi', 'mkv']:
+        st.video(uploaded_file)
+    else:
+        st.audio(uploaded_file, format=f'audio/{file_type}')
     
     if st.button("🎬 Generate Video"):
         with st.status("Processing...", expanded=True) as status:
             
             # 1. Save temp input file
-            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") 
+            # We need to preserve extension for tools to recognize format
+            ext = "." + file_type
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=ext) 
             tfile.write(uploaded_file.read())
             temp_input_path = tfile.name
-            tfile.close() # Close so other processes can access it if needed
+            tfile.close() 
 
             output_video_path = f"output_{uuid.uuid4().hex[:8]}.mp4"
             
             try:
                 # 2. Analyze Audio
                 status.write("🎵 Analyzing Audio Data (FFT)...")
+                
+                # librosa.load will extract audio from video files automatically via ffmpeg
                 y, sr, total_duration, rms_norm, spec_norm = get_audio_features(temp_input_path)
                 
                 # Duration Logic
@@ -179,6 +194,8 @@ if uploaded_file is not None:
                     return draw_frame(t, visual_style, rms_norm, spec_norm, sr, W, H)
                 
                 clip = VideoClip(make_frame_wrapper, duration=render_duration)
+                
+                # Extract audio from the input file (works for both audio and video inputs)
                 audio_clip = AudioFileClip(temp_input_path).subclip(0, render_duration)
                 clip = clip.set_audio(audio_clip)
                 
@@ -212,7 +229,3 @@ if uploaded_file is not None:
                 # Cleanup
                 if os.path.exists(temp_input_path):
                     os.remove(temp_input_path)
-                # Note: We might want to keep output_video_path for the user to download,
-                # but in a real app, you'd use a temp dir that auto-cleans or a background job.
-                # For this session-based script, leaving the output file is acceptable 
-                # until the script reruns or the user cleans up.
