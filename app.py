@@ -152,6 +152,15 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
+    st.markdown("**Orientation**")
+    orientation = st.radio(
+        "Orientation",
+        ["Landscape (16:9)", "Portrait (9:16)"],
+        index=0,
+        help="Portrait is best for TikTok, Reels, and Shorts",
+        label_visibility="collapsed"
+    )
+    
     st.markdown("**Duration**")
     duration_mode = st.radio(
         "Duration", 
@@ -182,7 +191,9 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
         bg = int(10 + (vol * 20))
         frame[:] = (bg, bg, bg+5)
         center = (W // 2, H // 2)
-        radius = int((H // 6) + (vol * (H // 2.5)))
+        # Dynamic radius scaling based on min dimension
+        min_dim = min(W, H)
+        radius = int((min_dim // 6) + (vol * (min_dim // 2.5)))
         Y, X = np.ogrid[:H, :W]
         mask = np.sqrt((X - center[0])**2 + (Y - center[1])**2) <= radius
         frame[mask] = [0, int(100 + (vol * 155)), int(200 + (vol * 55))]
@@ -202,7 +213,11 @@ def draw_frame(t, style, rms_norm, spec_norm, sr, W, H):
         Y, X = Y - center_y, X - center_x
         R, Theta = np.sqrt(X**2 + Y**2), (np.arctan2(Y, X) - t*0.5) % (2*np.pi)
         freq_idx = np.clip((Theta/(2*np.pi)*len(freq_col)).astype(int), 0, len(freq_col)-1)
-        mask = (R > 50) & (R < 50 + freq_col[freq_idx]*(min(W,H)//2-70)*1.5)
+        
+        min_dim = min(W, H)
+        max_dist = min_dim // 2 - 20
+        mask = (R > 50) & (R < 50 + freq_col[freq_idx]*(max_dist-50)*1.5)
+        
         hue = Theta / (2 * np.pi)
         frame[mask, 0] = (np.sin(hue[mask]*6.28)*127+128).astype(np.uint8)
         frame[mask, 1] = (np.sin(hue[mask]*6.28+2)*127+128).astype(np.uint8)
@@ -262,6 +277,10 @@ if uploaded_file is not None:
                 elif resolution_mode == "HD (720p)": W, H = 1280, 720
                 else: W, H = 1920, 1080
                 
+                # Aspect Ratio Logic
+                if orientation == "Portrait (9:16)":
+                    W, H = H, W
+                
                 def mf(t): return draw_frame(t, visual_style, rms, spec, sr, W, H)
                 clip = VideoClip(mf, duration=rend_dur)
                 audio = AudioFileClip(temp_input_path).subclip(0, rend_dur)
@@ -280,6 +299,7 @@ if uploaded_file is not None:
                 st.markdown("### :material/check_circle: Your Masterpiece")
                 st.video(output_video_path)
                 
+                # Main Download
                 with open(output_video_path, "rb") as f:
                     st.download_button(
                         label="DOWNLOAD VIDEO",
@@ -288,4 +308,17 @@ if uploaded_file is not None:
                         mime="video/mp4",
                         use_container_width=True
                     )
-                st.markdown("<p style='text-align:center; color:#86868b;'>Ready to share!</p>", unsafe_allow_html=True)
+                
+                # Social Share Shortcuts
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("### :material/share: Share Your Creation")
+                s_col1, s_col2, s_col3 = st.columns(3)
+                
+                with s_col1:
+                    st.link_button("YouTube", "https://studio.youtube.com", icon=":material/smart_display:", use_container_width=True)
+                with s_col2:
+                    st.link_button("TikTok", "https://www.tiktok.com/upload", icon=":material/music_note:", use_container_width=True)
+                with s_col3:
+                    st.link_button("Instagram", "https://www.instagram.com/", icon=":material/photo_camera:", use_container_width=True)
+                
+                st.markdown("<p style='text-align:center; color:#86868b; font-size: 0.9rem; margin-top:10px;'>Download first, then click a platform to upload!</p>", unsafe_allow_html=True)
